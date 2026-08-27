@@ -261,7 +261,7 @@ function renderFacilitator() {
         </div>
         <div style="display:flex;gap:8px;flex-wrap:wrap">
           <button class="pill-btn" onclick="refreshAll()">↻ Refresh now</button>
-          <button class="pill-btn on" id="genDeckBtn" onclick="generateDeckNow()">📊 Generate Summary Deck</button>
+          <button class="pill-btn on" id="genDeckBtn" onclick="generateDeckNow()">📊 Generate ${r.label} Summary</button>
         </div>
       </div>
 
@@ -336,6 +336,8 @@ function confirmClear(round) {
 }
 
 async function generateDeckNow() {
+  const round = state.facRound;
+  const roundLabel = ROUNDS[round].label;
   const btn = document.getElementById('genDeckBtn');
   const statusCard = document.getElementById('deckStatusCard');
   if (!backendConfigured()) {
@@ -347,15 +349,15 @@ async function generateDeckNow() {
   btn.disabled = true;
   btn.textContent = '⏳ Generating… (can take up to a minute)';
   statusCard.style.display = 'block';
-  statusCard.innerHTML = `<div class="empty-state">Building the deck from all three rounds — please don't close this tab…</div>`;
+  statusCard.innerHTML = `<div class="empty-state">Building the ${roundLabel} summary — please don't close this tab…</div>`;
 
   try {
-    const res = await fetch(`${APPS_SCRIPT_URL}?action=generateDeck`);
+    const res = await fetch(`${APPS_SCRIPT_URL}?action=generateDeck&round=${round}`);
     const data = await res.json();
     if (data.ok) {
       statusCard.innerHTML = `
         <div style="color:var(--primary-dark)">
-          <strong>✓ Deck generated</strong> — ${data.slideCount} slides, ${data.totalResponses} total responses across all 3 rounds.
+          <strong>✓ ${roundLabel} summary generated</strong> — ${data.slideCount} slides, ${data.totalResponses} responses.
           <div style="margin-top:8px">
             <a href="${data.driveUrl}" target="_blank" class="small-btn" style="text-decoration:none;display:inline-block">Open in Google Drive →</a>
           </div>
@@ -368,7 +370,7 @@ async function generateDeckNow() {
     statusCard.innerHTML = `<div class="warn-note">⚠ Could not reach the backend: ${e.message}</div>`;
   } finally {
     btn.disabled = false;
-    btn.textContent = '📊 Generate Summary Deck';
+    btn.textContent = `📊 Generate ${roundLabel} Summary`;
   }
 }
 
@@ -376,6 +378,7 @@ async function refreshAll() {
   if (state.mode !== 'facilitator') return;
   const round = state.facRound;
   const records = await listResponses(round);
+  records.forEach((r, i) => { r.anonId = i + 1; }); // "Response N" instead of real names, anywhere displayed live
 
   const countEl = document.getElementById('respCount');
   if (countEl) countEl.textContent = `${records.length} response${records.length===1?'':'s'} so far`;
@@ -383,7 +386,7 @@ async function refreshAll() {
   const whoList = document.getElementById('whoList');
   if (whoList) {
     whoList.innerHTML = records.length ? records.slice().reverse().map(rec => `
-      <li class="resp-item"><span class="resp-name">${escapeHtml(rec.name)}</span><span class="resp-time">${new Date(rec.submittedAt).toLocaleTimeString()}</span></li>
+      <li class="resp-item"><span class="resp-name">Response ${rec.anonId}</span><span class="resp-time">${new Date(rec.submittedAt).toLocaleTimeString()}</span></li>
     `).join('') : '<li class="empty-state">No responses yet — waiting for participants to scan the QR code.</li>';
   }
 
@@ -450,7 +453,7 @@ function renderOtherList(records, segKey, fieldKey, label) {
   return `<div style="margin:10px 0 6px">
     <div style="font-size:.74rem;font-weight:800;color:var(--text-muted);text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px">${label} — Other (participant-added)</div>
     <ul class="resp-list">
-      ${entries.map(e => `<li class="resp-item"><span class="resp-name">${escapeHtml(e.name)}</span><span class="resp-time">${new Date(e.submittedAt).toLocaleTimeString()}</span><div class="resp-field">${escapeHtml(e.answers[segKey][fieldKey])}</div></li>`).join('')}
+      ${entries.map(e => `<li class="resp-item"><span class="resp-name">Response ${e.anonId}</span><span class="resp-time">${new Date(e.submittedAt).toLocaleTimeString()}</span><div class="resp-field">${escapeHtml(e.answers[segKey][fieldKey])}</div></li>`).join('')}
     </ul>
   </div>`;
 }
@@ -491,7 +494,7 @@ function renderAmbitionSummary(records) {
         <ul class="resp-list">
           ${entries.map(e => `
             <li class="resp-item">
-              <span class="resp-name">${escapeHtml(e.name)}</span><span class="resp-time">${new Date(e.submittedAt).toLocaleTimeString()}</span>
+              <span class="resp-name">Response ${e.anonId}</span><span class="resp-time">${new Date(e.submittedAt).toLocaleTimeString()}</span>
               ${e.answers[seg.key].role ? `<div class="resp-field"><strong>Role:</strong> ${escapeHtml(e.answers[seg.key].role)}</div>` : ''}
               ${e.answers[seg.key].promise ? `<div class="resp-field"><strong>Promise:</strong> ${escapeHtml(e.answers[seg.key].promise)}</div>` : ''}
               ${e.answers[seg.key].feel && e.answers[seg.key].feel.length ? `<div class="resp-field"><strong>Feeling:</strong> ${escapeHtml(e.answers[seg.key].feel.join(', '))}</div>` : ''}
