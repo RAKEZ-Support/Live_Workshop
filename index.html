@@ -120,6 +120,13 @@
   .other-input:focus { outline:none; border-style:solid; border-color:var(--accent-teal); background:#fff; font-style:normal; box-shadow:0 0 0 3.5px rgba(0,168,150,.13); }
 
   .vision-card { border:1px solid var(--hairline); border-top:3px solid var(--sc,var(--accent-teal)); border-radius:14px; padding:15px 16px 18px; margin-bottom:14px; }
+  .vscale-wrap { margin-bottom:18px; }
+  .vscale-axis { display:flex; justify-content:space-between; font-size:.66rem; font-weight:800; letter-spacing:.05em; color:var(--text-muted); margin-bottom:6px; }
+  .vscale-bar { display:flex; height:14px; border-radius:8px; overflow:hidden; }
+  .vscale-seg { flex:1; }
+  .vscale-labels { display:flex; gap:6px; margin-top:8px; }
+  .vscale-labels > div { flex:1; text-align:center; font-size:.66rem; color:var(--text-muted); line-height:1.35; }
+  .vscale-labels strong { display:block; color:var(--text-main); font-size:.72rem; margin-bottom:2px; }
   .cx-readout { display:flex; align-items:baseline; gap:8px; }
   .cx-score { font-size:1.5rem; font-weight:800; line-height:1; color:var(--sc,var(--accent-teal)); font-variant-numeric:tabular-nums; min-width:44px; text-align:right; }
   .cx-score .cx-max { font-size:.78rem; font-weight:700; color:#9aa4b2; }
@@ -406,7 +413,7 @@ async function refreshAll() {
 
 function renderVisionSummary(records) {
   return SEGMENTS.map(seg => {
-    const scores = records.map(r => r.answers && r.answers[seg.key]).filter(v => typeof v === 'number');
+    const scores = records.map(r => r.answers && r.answers[seg.key] && r.answers[seg.key].score).filter(v => typeof v === 'number');
     const counts = [0,0,0,0,0];
     scores.forEach(v => { const band = levelForScore(v); counts[LEVELS.indexOf(band.name)]++; });
     const max = Math.max(...counts, 1);
@@ -423,6 +430,7 @@ function renderVisionSummary(records) {
             <div class="bar-track"><div class="bar-fill ${counts[i]>0 && i===modeIdx?'top':''}" style="width:${(counts[i]/max*100)||0}%"></div></div>
             <div class="bar-count">${counts[i]}</div>
           </div>`).join('')}
+        ${renderOtherList(records, seg.key, 'benchmark', 'Aspiration Benchmark Statement')}
       </div>`;
   }).join('');
 }
@@ -513,9 +521,12 @@ function exportRound(round) {
       SEGMENTS.forEach(seg => {
         const a = r.answers && r.answers[seg.key];
         if (a === undefined || a === null) return;
-        if (round === 'vision' && typeof a === 'number') {
-          rows.push([r.name, seg.label, 'Score', a.toFixed(1), new Date(r.submittedAt).toISOString()]);
-          rows.push([r.name, seg.label, 'Level', levelForScore(a).name, new Date(r.submittedAt).toISOString()]);
+        if (round === 'vision') {
+          if (typeof a.score === 'number') {
+            rows.push([r.name, seg.label, 'Score', a.score.toFixed(1), new Date(r.submittedAt).toISOString()]);
+            rows.push([r.name, seg.label, 'Level', levelForScore(a.score).name, new Date(r.submittedAt).toISOString()]);
+          }
+          if (a.benchmark) rows.push([r.name, seg.label, 'Aspiration Benchmark Statement', a.benchmark, new Date(r.submittedAt).toISOString()]);
         } else if (round === 'ambition') {
           if (a.role) rows.push([r.name, seg.label, 'Role', a.role, new Date(r.submittedAt).toISOString()]);
           if (a.promise) rows.push([r.name, seg.label, 'Promise', a.promise, new Date(r.submittedAt).toISOString()]);
@@ -576,8 +587,36 @@ function renderParticipant() {
     </div>`;
 }
 
+const VISION_BENCHMARK_EXAMPLES = {
+  ni: "e.g., RAKEZ should be the 'Amazon' of Free Zones—seamless, self-service, and hyper-efficient",
+  ind: "e.g., RAKEZ aspires to be the 'HSBC Commercial' of Free Zones—trusted, strategic, and scalable",
+  lta: "e.g., RAKEZ should be effortless and self-service for high-volume, lower-touch agents",
+  sa: "e.g., RAKEZ should be the 'Apple Partner Network' of Free Zones—rewarding and effortless"
+};
+
+function visionScaleReference() {
+  return `
+    <div class="vscale-wrap">
+      <div class="vscale-axis"><span>POOR EXPERIENCE</span><span>GREAT EXPERIENCE</span></div>
+      <div class="vscale-bar">
+        <div class="vscale-seg" style="background:${LEVEL_COLORS[0]}"></div>
+        <div class="vscale-seg" style="background:${LEVEL_COLORS[1]}"></div>
+        <div class="vscale-seg" style="background:${LEVEL_COLORS[2]}"></div>
+        <div class="vscale-seg" style="background:${LEVEL_COLORS[3]}"></div>
+        <div class="vscale-seg" style="background:${LEVEL_COLORS[4]}"></div>
+      </div>
+      <div class="vscale-labels">
+        <div><strong>Complex</strong><span>High friction; unclear steps; manual follow-up</span></div>
+        <div><strong>Transactional</strong><span>Functional but siloed; task-by-task and reactive</span></div>
+        <div><strong>Guided</strong><span>Digital and guided, but less intuitive</span></div>
+        <div><strong>Effortless</strong><span>Connected journeys with minimal customer effort</span></div>
+        <div><strong>Proactive & Loved</strong><span>Anticipates needs and builds advocacy</span></div>
+      </div>
+    </div>`;
+}
+
 function visionForm() {
-  return SEGMENTS.map(seg => `
+  return visionScaleReference() + SEGMENTS.map(seg => `
     <div class="vision-card" style="--sc:${seg.color}" data-seg="${seg.key}" data-touched="0">
       <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:2px">
         <div class="segment-badge ${seg.badge}"><span class="ic">${seg.icon}</span>${seg.label} <span style="color:var(--danger)">*</span></div>
@@ -590,6 +629,8 @@ function visionForm() {
         oninput="updateVisionSlider('${seg.key}', this.value)" aria-label="${seg.label} CX score">
       <div class="slider-ticks"><span>0</span><span>1</span><span>2</span><span>3</span><span>4</span><span>5</span></div>
       <div class="err" id="vErr_${seg.key}">Please set a score for this segment before submitting.</div>
+      <label style="margin-top:14px">Aspiration Benchmark Statement <span style="font-weight:500;color:var(--text-muted)">(optional)</span></label>
+      <textarea id="vbenchmark_${seg.key}" placeholder="${VISION_BENCHMARK_EXAMPLES[seg.key]}"></textarea>
     </div>`).join('');
 }
 
@@ -699,9 +740,14 @@ function clearErrById(errId) {
 function collectVisionAnswers() {
   const answers = {};
   document.querySelectorAll('.vision-card').forEach(card => {
+    const seg = card.dataset.seg;
+    const benchmark = document.getElementById(`vbenchmark_${seg}`).value.trim();
     if (card.dataset.touched === '1') {
       const slider = card.querySelector('.range-slider');
-      answers[card.dataset.seg] = Math.round(parseFloat(slider.value) * 10) / 10;
+      answers[seg] = { score: Math.round(parseFloat(slider.value) * 10) / 10, benchmark: benchmark };
+    } else if (benchmark) {
+      // Slider untouched but they wrote a benchmark anyway — still capture the text (score stays null)
+      answers[seg] = { score: null, benchmark: benchmark };
     }
   });
   return answers;
